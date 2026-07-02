@@ -1,0 +1,1 @@
+{"version":3,"file":"participantUpdate.d.ts","sourceRoot":"","sources":["../../../src/generated/types/participantUpdate.ts"],"names":[],"mappings":"AAAA;;;;;;GAMG;AAEH,MAAM,WAAW,iBAAiB;IAChC;;;SAGK;IACL,IAAI,CAAC,EAAE,MAAM,CAAC;IACd,WAAW,CAAC,EAAE,OAAO,CAAC;IACtB,gBAAgB;IAChB,OAAO,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;IACxB,gBAAgB;IAChB,MAAM,CAAC,EAAE,MAAM,GAAG,IAAI,CAAC;CACxB"}
