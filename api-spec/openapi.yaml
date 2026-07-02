@@ -1,0 +1,814 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: rooms
+    description: Planning poker room operations
+  - name: groups
+    description: Group (breakout table) operations
+  - name: participants
+    description: Participant operations
+  - name: teams
+    description: Participant group (team) operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /rooms:
+    post:
+      operationId: createRoom
+      tags: [rooms]
+      summary: Create a new planning poker room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "201":
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Room"
+
+  /rooms/{key}:
+    get:
+      operationId: getRoomState
+      tags: [rooms]
+      summary: Get full room state (room, groups, participants) for polling
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Room state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoomState"
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{key}/join:
+    post:
+      operationId: joinRoom
+      tags: [rooms]
+      summary: Join a room as a participant
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRoomInput"
+      responses:
+        "201":
+          description: Joined room
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        "400":
+          description: Room is full or invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{key}/groups:
+    post:
+      operationId: createGroup
+      tags: [groups]
+      summary: Create a new group (breakout table) in a room
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupInput"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /groups/{id}:
+    patch:
+      operationId: updateGroup
+      tags: [groups]
+      summary: Rename a group or set its current story (resets votes and reveal state)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupUpdate"
+      responses:
+        "200":
+          description: Group updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteGroup
+      tags: [groups]
+      summary: Delete a group; its participants become unassigned
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Group deleted
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /groups/{id}/reveal:
+    post:
+      operationId: revealGroupVotes
+      tags: [groups]
+      summary: Reveal votes for a group's current round
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Group with revealed votes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /groups/{id}/reset:
+    post:
+      operationId: resetGroupVotes
+      tags: [groups]
+      summary: Start a new voting round for a group (clears votes, hides reveal)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Group with fresh round
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /groups/{id}/stories:
+    post:
+      operationId: importStories
+      tags: [groups]
+      summary: Bulk import stories into a group's backlog (e.g. from a CSV file)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImportStoriesInput"
+      responses:
+        "201":
+          description: Group with imported stories
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Group not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stories/{storyId}/start:
+    post:
+      operationId: startStory
+      tags: [groups]
+      summary: Set a backlog story as the group's active story and start a fresh voting round
+      parameters:
+        - name: storyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Group with new active story
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Story not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stories/{storyId}/votes:
+    get:
+      operationId: getStoryVotes
+      tags: [groups]
+      summary: Get the recorded vote history for a story (e.g. a completed backlog item)
+      parameters:
+        - name: storyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The story's recorded votes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryVotes"
+        "404":
+          description: Story not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /stories/{storyId}:
+    delete:
+      operationId: deleteStory
+      tags: [groups]
+      summary: Remove a story from the backlog
+      parameters:
+        - name: storyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Story deleted
+        "404":
+          description: Story not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /groups/{id}/vote:
+    post:
+      operationId: castVote
+      tags: [groups]
+      summary: Cast or update a vote for the current round
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VoteInput"
+      responses:
+        "200":
+          description: Group state after vote
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Group or participant not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /participants/{id}:
+    patch:
+      operationId: updateParticipant
+      tags: [participants]
+      summary: Move a participant to a different group, toggle spectator, or rename
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParticipantUpdate"
+      responses:
+        "200":
+          description: Participant updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Participant"
+        "404":
+          description: Participant not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: leaveRoom
+      tags: [participants]
+      summary: Remove a participant from the room
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Participant removed
+        "404":
+          description: Participant not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /rooms/{key}/teams:
+    post:
+      operationId: createTeam
+      tags: [teams]
+      summary: Create a participant group (team) in a room
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInput"
+      responses:
+        "201":
+          description: Team created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "404":
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /teams/{id}:
+    patch:
+      operationId: updateTeam
+      tags: [teams]
+      summary: Rename a participant group or change its color
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamUpdate"
+      responses:
+        "200":
+          description: Team updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        "404":
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteTeam
+      tags: [teams]
+      summary: Delete a participant group; its members become ungrouped
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Team deleted
+        "404":
+          description: Team not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    RoomInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        votingScale:
+          type: string
+          enum: [fibonacci, tshirt]
+
+    Room:
+      type: object
+      required: [id, key, name, votingScale, createdAt]
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        name:
+          type: string
+        votingScale:
+          type: string
+          enum: [fibonacci, tshirt]
+        createdAt:
+          type: string
+          format: date-time
+
+    JoinRoomInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        isSpectator:
+          type: boolean
+        groupId:
+          type: ["string", "null"]
+
+    ParticipantUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        isSpectator:
+          type: boolean
+        groupId:
+          type: ["string", "null"]
+        teamId:
+          type: ["string", "null"]
+
+    Participant:
+      type: object
+      required: [id, roomId, groupId, teamId, name, isSpectator, createdAt]
+      properties:
+        id:
+          type: string
+        roomId:
+          type: string
+        groupId:
+          type: ["string", "null"]
+        teamId:
+          type: ["string", "null"]
+        name:
+          type: string
+        isSpectator:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Team:
+      type: object
+      required: [id, roomId, name, color, order]
+      properties:
+        id:
+          type: string
+        roomId:
+          type: string
+        name:
+          type: string
+        color:
+          type: string
+        order:
+          type: integer
+
+    TeamInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        color:
+          type: string
+
+    TeamUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+        color:
+          type: string
+
+    GroupInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+
+    GroupUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 60
+        currentStoryTitle:
+          type: ["string", "null"]
+          maxLength: 120
+
+    VoteInput:
+      type: object
+      required: [participantId, value]
+      properties:
+        participantId:
+          type: string
+        value:
+          type: string
+          minLength: 1
+          maxLength: 10
+
+    ParticipantState:
+      type: object
+      required: [id, name, isSpectator, hasVoted, teamId]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        isSpectator:
+          type: boolean
+        hasVoted:
+          type: boolean
+        voteValue:
+          type: ["string", "null"]
+        teamId:
+          type: ["string", "null"]
+
+    Group:
+      type: object
+      required:
+        [
+          id,
+          roomId,
+          name,
+          currentStoryTitle,
+          revealed,
+          round,
+          participants,
+          backlog,
+        ]
+      properties:
+        id:
+          type: string
+        roomId:
+          type: string
+        name:
+          type: string
+        currentStoryTitle:
+          type: ["string", "null"]
+        activeStoryId:
+          type: ["string", "null"]
+        revealed:
+          type: boolean
+        round:
+          type: integer
+        average:
+          type: ["number", "null"]
+        allSame:
+          type: boolean
+        participants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantState"
+        backlog:
+          type: array
+          items:
+            $ref: "#/components/schemas/Story"
+
+    Story:
+      type: object
+      required: [id, groupId, title, order, status, finalEstimate]
+      properties:
+        id:
+          type: string
+        groupId:
+          type: string
+        title:
+          type: string
+        order:
+          type: integer
+        status:
+          type: string
+          enum: [pending, active, done]
+        finalEstimate:
+          type: ["string", "null"]
+
+    StoryVote:
+      type: object
+      required: [participantId, name, teamId, value]
+      properties:
+        participantId:
+          type: string
+        name:
+          type: string
+        teamId:
+          type: ["string", "null"]
+        value:
+          type: string
+
+    StoryVotes:
+      type: object
+      required: [storyId, title, finalEstimate, average, allSame, votes]
+      properties:
+        storyId:
+          type: string
+        title:
+          type: string
+        finalEstimate:
+          type: ["string", "null"]
+        average:
+          type: ["number", "null"]
+        allSame:
+          type: boolean
+        votes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StoryVote"
+
+    ImportStoriesInput:
+      type: object
+      required: [titles]
+      properties:
+        titles:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 200
+
+    RoomState:
+      type: object
+      required:
+        [room, groups, teams, unassigned, participantCount, maxParticipants]
+      properties:
+        room:
+          $ref: "#/components/schemas/Room"
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/Group"
+        teams:
+          type: array
+          items:
+            $ref: "#/components/schemas/Team"
+        unassigned:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipantState"
+        participantCount:
+          type: integer
+        maxParticipants:
+          type: integer
